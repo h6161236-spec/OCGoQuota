@@ -1,5 +1,20 @@
 # OCGoQuota Android
 
+## 界面预览
+
+Android 客户端提供用量总览、Token 统计、模型排行、使用记录和每日费用趋势等功能。
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.jpg" alt="用量统计总览" width="220">
+  <img src="docs/screenshots/usage-records.jpg" alt="最近使用记录" width="220">
+  <img src="docs/screenshots/token-ranking.jpg" alt="Token 模型排行" width="220">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/daily-trends.jpg" alt="每日费用趋势" width="220">
+  <img src="docs/screenshots/usage-ranking.jpg" alt="模型用量排行" width="220">
+</p>
+
 OCGoQuota Android 是一个面向 OpenCode Go 的本地用量统计应用，使用 Tauri 2、Rust、SQLite 和 React 构建。
 
 本项目基于 [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) 二次开发，当前版本专注 Android 移动端，加入了本地 Rust 核心、加密 Cookie 存储、触摸下拉刷新和 Android APK 构建流程。感谢原作者 Evan Fu 的开源项目与基础实现！

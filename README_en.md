@@ -1,5 +1,20 @@
 # OCGoQuota Android
 
+## Screenshots
+
+The Android app provides a clear overview of account quotas, token usage, model rankings, usage records, and daily cost trends.
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.jpg" alt="Usage overview" width="220">
+  <img src="docs/screenshots/usage-records.jpg" alt="Usage records" width="220">
+  <img src="docs/screenshots/token-ranking.jpg" alt="Token ranking" width="220">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/daily-trends.jpg" alt="Daily trends" width="220">
+  <img src="docs/screenshots/usage-ranking.jpg" alt="Usage ranking" width="220">
+</p>
+
 OCGoQuota Android is a local usage dashboard for OpenCode Go, built with Tauri 2, Rust, SQLite, and React.
 
 This project is adapted from [evanfu0110/68hub](https://github.com/evanfu0110/68hub/). OCGoQuota is Android-only and adds a local Rust core, encrypted Cookie storage, touch pull-to-refresh, and an Android APK release pipeline. Many thanks to Evan Fu for the original open-source project and foundation!
