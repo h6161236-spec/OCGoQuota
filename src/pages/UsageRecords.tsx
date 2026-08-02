@@ -31,10 +31,7 @@ export function UsageRecords() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{t('usageRecords.title')}</h1>
-          <p className="text-sm text-base-content/50 mt-1">{t('usageRecords.subtitle', { total: total.toLocaleString() })}</p>
-        </div>
+        <div className="h-[52px]" aria-hidden="true" />
         <div className="flex items-center gap-2">
           <select
             className="select select-bordered select-sm flex-1 sm:w-40"

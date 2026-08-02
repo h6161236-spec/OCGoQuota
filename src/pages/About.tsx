@@ -1,23 +1,13 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api/client';
 
 export function About() {
   const { t } = useTranslation();
-  const [version, setVersion] = useState('2.0.0');
-
-  useEffect(() => {
-    api.getAppVersion().then(setVersion).catch(() => {});
-  }, []);
 
   const openLink = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
 
   return (
     <div className="max-w-3xl space-y-6">
-      <header>
-        <h1 className="text-lg font-bold">{t('about.title')}</h1>
-        <p className="text-xs text-base-content/40 mt-1">{t('about.version', { version })}</p>
-      </header>
+      <div className="h-12" aria-hidden="true" />
 
       <section className="border border-base-200 rounded-xl p-4 space-y-3">
         <p className="text-sm text-base-content/70 leading-relaxed">{t('about.desc1')}</p>

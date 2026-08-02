@@ -248,7 +248,7 @@ export function Dashboard() {
           transition: isPulling ? 'none' : 'transform 180ms ease',
         }}
       >
-        <h1 className="text-lg font-bold">{t('dashboard.title')}</h1>
+        <div className="h-7" aria-hidden="true" />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {hero.map((h) => (

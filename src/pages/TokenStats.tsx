@@ -45,10 +45,7 @@ export function TokenStats() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold">{t('tokenStats.title')}</h1>
-          <p className="text-xs text-base-content/40 mt-1">{t('tokenStats.subtitle')}</p>
-        </div>
+        <div className="h-12" aria-hidden="true" />
         <div className="grid grid-cols-2 sm:flex items-center gap-2">
           <select
             className="select select-bordered select-sm w-full sm:w-36"

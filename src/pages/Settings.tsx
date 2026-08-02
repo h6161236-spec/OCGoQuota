@@ -152,10 +152,7 @@ export function Settings() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <header>
-        <h1 className="text-lg font-bold">{t('settings.title')}</h1>
-        <p className="text-xs text-base-content/45 mt-1">{t('settings.subtitle')}</p>
-      </header>
+      <div className="h-12" aria-hidden="true" />
 
       <section className="settings-section">
         <div>
