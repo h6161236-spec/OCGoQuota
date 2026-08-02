@@ -3,11 +3,12 @@ import { initReactI18next } from 'react-i18next';
 import zh from './locales/zh.json';
 import en from './locales/en.json';
 
-const STORAGE_KEY = '68hub-language';
+const STORAGE_KEY = 'ocgoquota-language';
+const LEGACY_STORAGE_KEY = '68hub-language';
 
 function detectLanguage(): string {
   if (typeof window === 'undefined') return 'zh';
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
   if (stored === 'zh' || stored === 'en') return stored;
   return navigator.language.startsWith('zh') ? 'zh' : 'en';
 }
@@ -22,7 +23,10 @@ i18n.use(initReactI18next).init({
 
 i18n.on('languageChanged', (lng) => {
   document.documentElement.lang = lng;
-  try { localStorage.setItem(STORAGE_KEY, lng); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, lng);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {}
 });
 
 if (typeof document !== 'undefined') {

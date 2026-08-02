@@ -1,6 +1,6 @@
-# 68HUB Android
+# OCGoQuota Android
 
-68HUB Android 是一个面向 OpenCode Go 的本地用量统计应用，使用 Tauri 2、Rust、SQLite 和 React 构建。
+OCGoQuota Android 是一个面向 OpenCode Go 的本地用量统计应用，使用 Tauri 2、Rust、SQLite 和 React 构建。
 
 本项目基于 [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) 二次开发，当前版本专注 Android 移动端，加入了本地 Rust 核心、加密 Cookie 存储、触摸下拉刷新和 Android APK 构建流程。感谢原作者 Evan Fu 的开源项目与基础实现！
 
@@ -20,11 +20,8 @@
 ```bash
 pnpm install
 
-# 浏览器模拟/桌面开发窗口
-pnpm dev
-
 # Android 真机或模拟器开发
-pnpm dev:android
+pnpm dev
 ```
 
 ## 构建 APK
@@ -51,7 +48,7 @@ src-tauri/           Tauri Android 配置
 
 ## 致谢
 
-感谢 [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) 提供原始项目和产品基础。本仓库是其 Android 移动端衍生版本。
+感谢 [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) 提供原始项目和产品基础。本仓库是 Android-only 的 OCGoQuota 衍生版本。
 
 ## License
 

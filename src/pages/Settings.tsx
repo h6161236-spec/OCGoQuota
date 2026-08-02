@@ -47,7 +47,7 @@ export function Settings() {
     const resolved = value === 'system'
       ? (navigator.language.startsWith('zh') ? 'zh' : 'en')
       : value;
-    if (value === 'system') localStorage.removeItem('68hub-language');
+    if (value === 'system') localStorage.removeItem('ocgoquota-language');
     await i18n.changeLanguage(resolved);
     setSettings((current) => ({ ...current, language: value }));
     try {

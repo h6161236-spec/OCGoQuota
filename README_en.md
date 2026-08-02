@@ -1,8 +1,8 @@
-# 68HUB Android
+# OCGoQuota Android
 
-68HUB Android is a local usage dashboard for OpenCode Go, built with Tauri 2, Rust, SQLite, and React.
+OCGoQuota Android is a local usage dashboard for OpenCode Go, built with Tauri 2, Rust, SQLite, and React.
 
-This project is adapted from [evanfu0110/68hub](https://github.com/evanfu0110/68hub/). The current version focuses on Android and adds a local Rust core, encrypted Cookie storage, touch pull-to-refresh, and an Android APK release pipeline. Many thanks to Evan Fu for the original open-source project and foundation!
+This project is adapted from [evanfu0110/68hub](https://github.com/evanfu0110/68hub/). OCGoQuota is Android-only and adds a local Rust core, encrypted Cookie storage, touch pull-to-refresh, and an Android APK release pipeline. Many thanks to Evan Fu for the original open-source project and foundation!
 
 ## Features
 
@@ -20,11 +20,8 @@ You need Node.js, pnpm, Rust, Android Studio/SDK, Java 17, and the Android NDK.
 ```bash
 pnpm install
 
-# Local frontend development
-pnpm dev
-
 # Android device or emulator development
-pnpm dev:android
+pnpm dev
 ```
 
 ## Build an APK
@@ -51,7 +48,7 @@ Account Cookies are used only on the device and stored in encrypted form. The ap
 
 ## Credits
 
-Thanks to [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) for the original project and product foundation. This repository is its Android mobile derivative.
+Thanks to [evanfu0110/68hub](https://github.com/evanfu0110/68hub/) for the original project and product foundation. This repository is the Android-only OCGoQuota derivative.
 
 ## License
 

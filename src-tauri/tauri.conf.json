@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "68HUB",
+  "productName": "OCGoQuota",
   "version": "2.0.0",
   "identifier": "com.hub68.v2",
   "build": {
@@ -11,16 +11,6 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "68HUB",
-        "width": 360,
-        "height": 640,
-        "resizable": false,
-        "fullscreen": false,
-        "decorations": false
-      }
-    ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; font-src 'self' data:"
     }

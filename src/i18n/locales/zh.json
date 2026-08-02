@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "68HUB",
+    "name": "OCGoQuota",
     "subtitle": "- OpenCode Go Manager"
   },
   "nav": {
@@ -223,14 +223,14 @@
     "syncDone": "同步完成，新增 {{count}} 条",
     "cookieGuide": {
       "title": "如何获取 Auth Cookie",
-      "android": "1. 先在可信任的桌面浏览器登录 opencode.ai 并取得 auth Cookie\n2. 通过自己的安全方式复制到手机\n3. 在 68HUB 添加账户并粘贴\n4. 粘贴后清除剪贴板，不要把 Cookie 发给任何人。"
+      "android": "1. 先在可信任的浏览器登录 opencode.ai 并取得 auth Cookie\n2. 通过自己的安全方式复制到手机\n3. 在 OCGoQuota 添加账户并粘贴\n4. 粘贴后清除剪贴板，不要把 Cookie 发给任何人。"
     }
   },
   "about": {
-    "title": "关于 68HUB",
+    "title": "关于 OCGoQuota",
     "version": "v{{version}} · OpenCode Go 用量统计面板",
-    "desc1": "68HUB 是一个专为 OpenCode Go 平价 Coding Plan 设计的 Android 本地用量统计应用。",
-    "desc2": "OpenCode AI 官方的用量页面数据分散、操作繁琐，难以直观掌握各模型的 Token 消耗和账户配额状态。68HUB 通过后端定时同步数据，以清晰的图表和布局展示关键指标，让你一目了然。",
+    "desc1": "OCGoQuota 是一个专为 OpenCode Go 平价 Coding Plan 设计的 Android 本地用量统计应用。",
+    "desc2": "OpenCode AI 官方的用量页面数据分散、操作繁琐，难以直观掌握各模型的 Token 消耗和账户配额状态。OCGoQuota 通过后端定时同步数据，以清晰的图表和布局展示关键指标，让你一目了然。",
     "download": "打开项目主页",
     "features": "功能",
     "feature1": "多账户配额实时监控（5小时 / 7天 / 30天）",
@@ -249,7 +249,7 @@
     "contact": "联系方式"
   },
   "onboarding": {
-    "welcome": "欢迎使用 68HUB",
+    "welcome": "欢迎使用 OCGoQuota",
     "subtitle": "选择偏好的外观和系统行为",
     "themeLabel": "界面主题",
     "tray": "后台运行",

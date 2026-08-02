@@ -1,9 +1,6 @@
 # Auto detect text files and set LF line endings
 * text=auto
 
-# Batch files should use CRLF
-*.bat text eol=crlf
-
 # Shell scripts should use LF
 *.sh text eol=lf
 
@@ -27,4 +24,3 @@
 *.png binary
 *.svg text eol=lf
 *.ttf binary
-*.exe binary

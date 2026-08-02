@@ -1,6 +1,6 @@
 {
   "$schema": "../gen/schemas/android-schema.json",
   "identifier": "default",
-  "description": "68HUB application capability",
+  "description": "OCGoQuota Android application capability",
   "permissions": ["core:default"]
 }

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "68HUB",
+    "name": "OCGoQuota",
     "subtitle": "- OpenCode Go Manager"
   },
   "nav": {
@@ -223,14 +223,14 @@
     "syncDone": "Sync complete, added {{count}} records",
     "cookieGuide": {
       "title": "How to get the Auth Cookie",
-      "android": "1. Sign in to opencode.ai in a trusted desktop browser and obtain the auth Cookie\n2. Transfer it to your phone using your own secure method\n3. Add an account in 68HUB and paste it\n4. Clear the clipboard afterwards and never share the Cookie."
+      "android": "1. Sign in to opencode.ai in a trusted browser and obtain the auth Cookie\n2. Transfer it to your phone using your own secure method\n3. Add an account in OCGoQuota and paste it\n4. Clear the clipboard afterwards and never share the Cookie."
     }
   },
   "about": {
-    "title": "About 68HUB",
+    "title": "About OCGoQuota",
     "version": "v{{version}} · OpenCode Go Usage Dashboard",
-    "desc1": "68HUB is a local Android usage dashboard designed for OpenCode Go affordable Coding Plans.",
-    "desc2": "OpenCode AI's official usage pages have scattered data and cumbersome operations, making it hard to grasp each model's token consumption and account quota status at a glance. 68HUB periodically syncs data through its backend, displaying key metrics with clear charts and layouts.",
+    "desc1": "OCGoQuota is a local Android usage dashboard designed for OpenCode Go affordable Coding Plans.",
+    "desc2": "OpenCode AI's official usage pages have scattered data and cumbersome operations, making it hard to grasp each model's token consumption and account quota status at a glance. OCGoQuota periodically syncs data through its backend, displaying key metrics with clear charts and layouts.",
     "download": "Open Project Homepage",
     "features": "Features",
     "feature1": "Multi-account real-time quota monitoring (5h / 7d / 30d)",
@@ -249,7 +249,7 @@
     "contact": "Contact"
   },
   "onboarding": {
-    "welcome": "Welcome to 68HUB",
+    "welcome": "Welcome to OCGoQuota",
     "subtitle": "Choose your preferred appearance and system behavior",
     "themeLabel": "Interface Theme",
     "tray": "Background operation",

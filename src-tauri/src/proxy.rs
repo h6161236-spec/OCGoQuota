@@ -20,7 +20,7 @@ fn base_builder() -> reqwest::ClientBuilder {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .redirect(reqwest::redirect::Policy::none())
-        .user_agent("Mozilla/5.0 (68HUB Android/2.0)")
+        .user_agent("Mozilla/5.0 (OCGoQuota Android/2.0)")
 }
 
 #[cfg(target_os = "android")]

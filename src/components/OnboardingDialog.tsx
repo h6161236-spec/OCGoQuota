@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from './ThemeProvider';
 
-const ONBOARDING_KEY = '68hub-onboarded';
+const ONBOARDING_KEY = 'ocgoquota-onboarded';
+const LEGACY_ONBOARDING_KEY = '68hub-onboarded';
 
 export function OnboardingDialog() {
   const { t } = useTranslation();
@@ -12,7 +13,7 @@ export function OnboardingDialog() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const done = localStorage.getItem(ONBOARDING_KEY);
+    const done = localStorage.getItem(ONBOARDING_KEY) ?? localStorage.getItem(LEGACY_ONBOARDING_KEY);
     if (!done && ref.current) {
       setShow(true);
       ref.current.showModal();
@@ -21,6 +22,7 @@ export function OnboardingDialog() {
 
   const handleFinish = async () => {
     localStorage.setItem(ONBOARDING_KEY, '1');
+    localStorage.removeItem(LEGACY_ONBOARDING_KEY);
     ref.current?.close();
     setShow(false);
   };

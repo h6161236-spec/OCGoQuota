@@ -1,3 +1,3 @@
 fn main() {
-    hub68_lib::run();
+    ocgoquota_lib::run();
 }

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 type Theme = 'light' | 'dark' | 'system';
 
-const STORAGE_KEY = '68hub-theme';
+const STORAGE_KEY = 'ocgoquota-theme';
+const LEGACY_STORAGE_KEY = '68hub-theme';
 const PREFER_DARK = '(prefers-color-scheme: dark)';
 
 interface ThemeContextValue {
@@ -19,7 +20,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
   if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
   return 'system';
 }
@@ -41,6 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = (t: Theme) => {
     setThemeState(t);
     localStorage.setItem(STORAGE_KEY, t);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
     const r = resolveTheme(t);
     setResolved(r);
     applyTheme(r);

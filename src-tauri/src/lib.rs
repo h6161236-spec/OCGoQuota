@@ -46,7 +46,7 @@ pub fn run() {
             commands::update_settings,
         ])
         .build(tauri::generate_context!())
-        .expect("failed to build 68HUB")
+        .expect("failed to build OCGoQuota")
         .run(|app, event| {
             #[cfg(not(target_os = "android"))]
             let _ = (&app, &event);
