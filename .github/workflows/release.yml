@@ -57,6 +57,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Initialize Android project
         run: pnpm tauri android init --ci
+      - name: Generate Android launcher icons
+        run: pnpm icons:android
       - name: Build unsigned arm64 APK
         run: pnpm tauri android build --apk --target aarch64 --ci
       - name: Restore release keystore

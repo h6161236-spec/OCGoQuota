@@ -11,6 +11,17 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "OCGoQuota",
+        "width": 360,
+        "height": 640,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; font-src 'self' data:"
     }
@@ -19,8 +30,7 @@
     "active": true,
     "createUpdaterArtifacts": false,
     "icon": [
-      "../public/icon.png",
-      "../public/icon.ico"
+      "../public/icon.png"
     ],
     "android": {
       "minSdkVersion": 28
