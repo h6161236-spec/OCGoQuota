@@ -40,10 +40,12 @@
     "seconds": "秒"
   },
   "timeRange": {
+    "today": "今天",
     "7days": "7 天",
     "14days": "14 天",
     "30days": "30 天",
-    "90days": "90 天"
+    "90days": "90 天",
+    "all": "全部"
   },
   "dashboard": {
     "title": "用量统计总览",
@@ -52,6 +54,8 @@
     "remainingQuota": "剩余配额",
     "avgRemainingRatio": "平均剩余比例",
     "totalTokenConsumption": "总 Token 消耗",
+    "todayTokenUsage": "今日 Token 用量",
+    "todayTokenDesc": "从今天零点起",
     "requests": "{{count}} 次请求",
     "accountQuotaStatus": "账户配额状态",
     "modelTop3": "模型用量 Top 3",
@@ -80,6 +84,13 @@
     "input": "输入",
     "output": "输出",
     "totalCost": "总费用",
+    "breakdownTitle": "Token 明细",
+    "uncachedInput": "未命中输入",
+    "cacheHit": "缓存命中",
+    "cacheWrite": "缓存写入",
+    "cacheHitRateLabel": "缓存命中率",
+    "totalInput": "总输入",
+    "cacheHitRate": "缓存命中率：{{rate}}%",
     "modelRanking": "模型排行",
     "dailyTrends": "每日趋势",
     "modelUsage": "各模型 Token 使用量",

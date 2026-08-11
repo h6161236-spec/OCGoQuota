@@ -81,6 +81,9 @@ impl Database {
               provider TEXT,
               input_tokens INTEGER NOT NULL,
               output_tokens INTEGER NOT NULL,
+              cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+              cache_write_5m_tokens INTEGER NOT NULL DEFAULT 0,
+              cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0,
               cost_raw INTEGER NOT NULL,
               cost_usd REAL NOT NULL,
               key_id TEXT,
@@ -151,17 +154,26 @@ impl Database {
                   workspace_id TEXT NOT NULL,
                   created_at TEXT NOT NULL,
                   model TEXT NOT NULL,
-                  provider TEXT,
-                  input_tokens INTEGER NOT NULL,
-                  output_tokens INTEGER NOT NULL,
-                  cost_raw INTEGER NOT NULL,
+                provider TEXT,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_write_5m_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_write_1h_tokens INTEGER NOT NULL DEFAULT 0,
+                cost_raw INTEGER NOT NULL,
                   cost_usd REAL NOT NULL,
                   key_id TEXT,
                   plan TEXT,
                   synced_at TEXT NOT NULL,
                   PRIMARY KEY (account_id, usg_id)
                 );
-                INSERT INTO usage_records SELECT * FROM usage_records_v2;
+                INSERT INTO usage_records (
+                  usg_id, account_id, workspace_id, created_at, model, provider,
+                  input_tokens, output_tokens, cost_raw, cost_usd, key_id, plan, synced_at
+                ) SELECT
+                  usg_id, account_id, workspace_id, created_at, model, provider,
+                  input_tokens, output_tokens, cost_raw, cost_usd, key_id, plan, synced_at
+                FROM usage_records_v2;
                 DROP TABLE usage_records_v2;
                 CREATE INDEX idx_usage_account_time ON usage_records(account_id, created_at DESC);
                 CREATE INDEX idx_usage_model_time ON usage_records(model, created_at DESC);
@@ -173,6 +185,64 @@ impl Database {
             "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (3, ?1)",
             [now_iso()],
         )?;
+        for column in [
+            "cache_read_tokens",
+            "cache_write_5m_tokens",
+            "cache_write_1h_tokens",
+        ] {
+            let exists: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('usage_records') WHERE name = ?1)",
+                [column],
+                |row| row.get(0),
+            )?;
+            if !exists {
+                conn.execute(
+                    &format!(
+                        "ALTER TABLE usage_records ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0"
+                    ),
+                    [],
+                )?;
+            }
+        }
+        conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?1)",
+            [now_iso()],
+        )?;
+
+        // Cache token columns were added after older records had already been
+        // synced. Force one complete history pass so those existing records
+        // are re-read from OpenCode and their cache fields can be populated.
+        let backfill_migration_applied = conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?1)",
+            [now_iso()],
+        )?;
+        if backfill_migration_applied > 0 {
+            conn.execute(
+                "UPDATE usage_sync_state
+                 SET last_sync_at = NULL,
+                     last_sync_status = NULL,
+                     last_sync_error = NULL,
+                     deepest_page_fetched = -1,
+                     history_complete = 0",
+                [],
+            )?;
+        }
+
+        // Migration: cost_raw is in 1e-8 USD units. Older versions divided by
+        // 1e9, underreporting every cost by 10x. Recompute cost_usd from the
+        // original integer cost_raw so existing records reflect the true cost.
+        let cost_migration_applied = conn.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (6, ?1)",
+            [now_iso()],
+        )?;
+        if cost_migration_applied > 0 {
+            conn.execute(
+                "UPDATE usage_records
+                 SET cost_usd = cost_raw / 100000000.0
+                 WHERE ABS(cost_usd - cost_raw / 100000000.0) > 0.0000001",
+                [],
+            )?;
+        }
         Ok(())
     }
 
@@ -287,13 +357,34 @@ impl Database {
         let tx = conn.unchecked_transaction()?;
         let mut inserted = 0;
         {
+            let existing_ids: std::collections::HashSet<String> = {
+                let mut query =
+                    tx.prepare("SELECT usg_id FROM usage_records WHERE account_id = ?1")?;
+                let ids = query
+                    .query_map([account_id], |row| row.get::<_, String>(0))?
+                    .collect::<Result<_, _>>()?;
+                ids
+            };
+            let mut seen_ids = std::collections::HashSet::new();
             let mut statement = tx.prepare(
-                r#"INSERT OR IGNORE INTO usage_records (
+                r#"INSERT INTO usage_records (
                   usg_id, account_id, workspace_id, created_at, model, provider,
-                  input_tokens, output_tokens, cost_raw, cost_usd, key_id, plan, synced_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"#,
+                  input_tokens, output_tokens, cache_read_tokens, cache_write_5m_tokens,
+                  cache_write_1h_tokens, cost_raw, cost_usd, key_id, plan, synced_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                ON CONFLICT(account_id, usg_id) DO UPDATE SET
+                  input_tokens = excluded.input_tokens,
+                  output_tokens = excluded.output_tokens,
+                  cache_read_tokens = excluded.cache_read_tokens,
+                  cache_write_5m_tokens = excluded.cache_write_5m_tokens,
+                  cache_write_1h_tokens = excluded.cache_write_1h_tokens,
+                  cost_raw = excluded.cost_raw,
+                  cost_usd = excluded.cost_usd,
+                  synced_at = excluded.synced_at"#,
             )?;
             for record in records {
+                let existed = existing_ids.contains(&record.usg_id)
+                    || !seen_ids.insert(record.usg_id.clone());
                 inserted += statement.execute(params![
                     record.usg_id,
                     account_id,
@@ -303,12 +394,18 @@ impl Database {
                     record.provider,
                     record.input_tokens,
                     record.output_tokens,
+                    record.cache_read_tokens,
+                    record.cache_write_5m_tokens,
+                    record.cache_write_1h_tokens,
                     record.cost_raw,
                     record.cost_usd,
                     record.key_id,
                     record.plan,
                     synced_at,
                 ])?;
+                if existed {
+                    inserted -= 1;
+                }
             }
         }
         tx.commit()?;
@@ -392,7 +489,10 @@ impl Database {
             .map_err(|_| AppError::Validation("usage offset is out of range".into()))?;
         let sql = format!(
             r#"SELECT ur.usg_id, ur.account_id, a.name, ur.created_at, ur.model,
-              ur.provider, ur.input_tokens, ur.output_tokens, ur.cost_usd, ur.key_id, ur.plan
+              ur.provider, ur.input_tokens,
+              ur.input_tokens + ur.cache_read_tokens + ur.cache_write_5m_tokens + ur.cache_write_1h_tokens,
+              ur.cache_read_tokens, ur.cache_write_5m_tokens + ur.cache_write_1h_tokens,
+              ur.output_tokens, ur.cost_usd, ur.key_id, ur.plan
               FROM usage_records ur JOIN accounts a ON a.id = ur.account_id
               {where_clause} ORDER BY ur.created_at DESC LIMIT ? OFFSET ?"#
         );
@@ -433,10 +533,22 @@ impl Database {
     pub fn daily_stats(&self, days: u16, account_id: Option<&str>) -> AppResult<Vec<DailyStat>> {
         let cutoff = format!("-{} days", days.clamp(1, 365));
         let conn = self.conn()?;
-        let (sql, has_account) = if account_id.is_some() {
-            ("SELECT substr(created_at, 1, 10), sum(cost_usd), count(*) FROM usage_records WHERE substr(created_at, 1, 10) >= date('now', ?1) AND account_id = ?2 GROUP BY 1 ORDER BY 1", true)
+        let (sql, has_account) = if days == 0 {
+            if account_id.is_some() {
+                ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') AND account_id = ?1 GROUP BY 1 ORDER BY 1", true)
+            } else {
+                ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') GROUP BY 1 ORDER BY 1", false)
+            }
+        } else if days == u16::MAX {
+            if account_id.is_some() {
+                ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records WHERE account_id = ?1 GROUP BY 1 ORDER BY 1", true)
+            } else {
+                ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records GROUP BY 1 ORDER BY 1", false)
+            }
+        } else if account_id.is_some() {
+            ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records WHERE substr(datetime(created_at, 'localtime'), 1, 10) >= date('now', 'localtime', ?1) AND account_id = ?2 GROUP BY 1 ORDER BY 1", true)
         } else {
-            ("SELECT substr(created_at, 1, 10), sum(cost_usd), count(*) FROM usage_records WHERE substr(created_at, 1, 10) >= date('now', ?1) GROUP BY 1 ORDER BY 1", false)
+            ("SELECT substr(datetime(created_at, 'localtime'), 1, 10), sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records WHERE substr(datetime(created_at, 'localtime'), 1, 10) >= date('now', 'localtime', ?1) GROUP BY 1 ORDER BY 1", false)
         };
         let mut statement = conn.prepare(sql)?;
         let mapper = |row: &Row<'_>| {
@@ -444,9 +556,30 @@ impl Database {
                 date: row.get(0)?,
                 total_cost_usd: row.get(1)?,
                 request_count: row.get(2)?,
+                total_input_tokens: row.get(3)?,
+                uncached_input_tokens: row.get(4)?,
+                cache_hit_tokens: row.get(5)?,
+                cache_write_tokens: row.get(6)?,
+                total_output_tokens: row.get(7)?,
             })
         };
-        if has_account {
+        if days == 0 && has_account {
+            Ok(statement
+                .query_map([account_id], mapper)?
+                .collect::<Result<Vec<_>, _>>()?)
+        } else if days == 0 {
+            Ok(statement
+                .query_map([], mapper)?
+                .collect::<Result<Vec<_>, _>>()?)
+        } else if days == u16::MAX && has_account {
+            Ok(statement
+                .query_map([account_id], mapper)?
+                .collect::<Result<Vec<_>, _>>()?)
+        } else if days == u16::MAX {
+            Ok(statement
+                .query_map([], mapper)?
+                .collect::<Result<Vec<_>, _>>()?)
+        } else if has_account {
             Ok(statement
                 .query_map(params![cutoff, account_id], mapper)?
                 .collect::<Result<Vec<_>, _>>()?)
@@ -465,11 +598,21 @@ impl Database {
         let cutoff = format!("-{} days", days.clamp(1, 365));
         let conn = self.conn()?;
         let base =
-            "SELECT substr(created_at, 1, 10), model, sum(cost_usd), count(*) FROM usage_records";
-        let sql = if account_id.is_some() {
-            format!("{base} WHERE substr(created_at, 1, 10) >= date('now', ?1) AND account_id = ?2 GROUP BY 1, 2 ORDER BY 1, 2")
+            "SELECT substr(datetime(created_at, 'localtime'), 1, 10), model, sum(cost_usd), count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens) FROM usage_records";
+        let sql = if days == 0 && account_id.is_some() {
+            format!("{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') AND account_id = ?1 GROUP BY 1, 2 ORDER BY 1, 2")
+        } else if days == 0 {
+            format!(
+                "{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') GROUP BY 1, 2 ORDER BY 1, 2"
+            )
+        } else if days == u16::MAX && account_id.is_some() {
+            format!("{base} WHERE account_id = ?1 GROUP BY 1, 2 ORDER BY 1, 2")
+        } else if days == u16::MAX {
+            format!("{base} GROUP BY 1, 2 ORDER BY 1, 2")
+        } else if account_id.is_some() {
+            format!("{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) >= date('now', 'localtime', ?1) AND account_id = ?2 GROUP BY 1, 2 ORDER BY 1, 2")
         } else {
-            format!("{base} WHERE substr(created_at, 1, 10) >= date('now', ?1) GROUP BY 1, 2 ORDER BY 1, 2")
+            format!("{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) >= date('now', 'localtime', ?1) GROUP BY 1, 2 ORDER BY 1, 2")
         };
         let mut statement = conn.prepare(&sql)?;
         let mapper = |row: &Row<'_>| {
@@ -478,9 +621,34 @@ impl Database {
                 model: row.get(1)?,
                 total_cost_usd: row.get(2)?,
                 request_count: row.get(3)?,
+                total_input_tokens: row.get(4)?,
+                uncached_input_tokens: row.get(5)?,
+                cache_hit_tokens: row.get(6)?,
+                cache_write_tokens: row.get(7)?,
+                total_output_tokens: row.get(8)?,
             })
         };
-        if let Some(id) = account_id {
+        if days == 0 {
+            if let Some(id) = account_id {
+                Ok(statement
+                    .query_map([id], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            } else {
+                Ok(statement
+                    .query_map([], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            }
+        } else if days == u16::MAX {
+            if let Some(id) = account_id {
+                Ok(statement
+                    .query_map([id], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            } else {
+                Ok(statement
+                    .query_map([], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            }
+        } else if let Some(id) = account_id {
             Ok(statement
                 .query_map(params![cutoff, id], mapper)?
                 .collect::<Result<Vec<_>, _>>()?)
@@ -497,17 +665,27 @@ impl Database {
         account_id: Option<&str>,
     ) -> AppResult<Vec<ModelTokenStat>> {
         let modifier = match range {
+            "today" | "0" => "today".to_string(),
+            "all" | "65535" => "all".to_string(),
             "5h" => "-5 hours".to_string(),
             "7d" => "-7 days".to_string(),
             "30d" => "-30 days".to_string(),
             value => format!("-{} days", value.parse::<u16>().unwrap_or(30).clamp(1, 365)),
         };
         let conn = self.conn()?;
-        let base = "SELECT model, count(*), sum(input_tokens), sum(output_tokens), sum(cost_usd) FROM usage_records";
-        let sql = if account_id.is_some() {
-            format!("{base} WHERE datetime(created_at) >= datetime('now', ?1) AND account_id = ?2 GROUP BY model ORDER BY sum(input_tokens + output_tokens) DESC")
+        let base = "SELECT model, count(*), sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens), sum(input_tokens), sum(cache_read_tokens), sum(cache_write_5m_tokens + cache_write_1h_tokens), sum(output_tokens), sum(cost_usd) FROM usage_records";
+        let sql = if modifier == "today" && account_id.is_some() {
+            format!("{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') AND account_id = ?1 GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
+        } else if modifier == "today" {
+            format!("{base} WHERE substr(datetime(created_at, 'localtime'), 1, 10) = date('now', 'localtime') GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
+        } else if modifier == "all" && account_id.is_some() {
+            format!("{base} WHERE account_id = ?1 GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
+        } else if modifier == "all" {
+            format!("{base} GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
+        } else if account_id.is_some() {
+            format!("{base} WHERE datetime(created_at) >= datetime('now', ?1) AND account_id = ?2 GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
         } else {
-            format!("{base} WHERE datetime(created_at) >= datetime('now', ?1) GROUP BY model ORDER BY sum(input_tokens + output_tokens) DESC")
+            format!("{base} WHERE datetime(created_at) >= datetime('now', ?1) GROUP BY model ORDER BY sum(input_tokens + cache_read_tokens + cache_write_5m_tokens + cache_write_1h_tokens + output_tokens) DESC")
         };
         let mut statement = conn.prepare(&sql)?;
         let mapper = |row: &Row<'_>| {
@@ -515,11 +693,24 @@ impl Database {
                 model: row.get(0)?,
                 request_count: row.get(1)?,
                 total_input_tokens: row.get(2)?,
-                total_output_tokens: row.get(3)?,
-                total_cost_usd: row.get(4)?,
+                uncached_input_tokens: row.get(3)?,
+                cache_hit_tokens: row.get(4)?,
+                cache_write_tokens: row.get(5)?,
+                total_output_tokens: row.get(6)?,
+                total_cost_usd: row.get(7)?,
             })
         };
-        if let Some(id) = account_id {
+        if modifier == "today" || modifier == "all" {
+            if let Some(id) = account_id {
+                Ok(statement
+                    .query_map([id], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            } else {
+                Ok(statement
+                    .query_map([], mapper)?
+                    .collect::<Result<Vec<_>, _>>()?)
+            }
+        } else if let Some(id) = account_id {
             Ok(statement
                 .query_map(params![modifier, id], mapper)?
                 .collect::<Result<Vec<_>, _>>()?)
@@ -616,11 +807,14 @@ fn map_usage(row: &Row<'_>) -> rusqlite::Result<UsageRecord> {
         created_at: row.get(3)?,
         model: row.get(4)?,
         provider: row.get(5)?,
-        input_tokens: row.get(6)?,
-        output_tokens: row.get(7)?,
-        cost_usd: row.get(8)?,
-        key_id: row.get(9)?,
-        plan: row.get(10)?,
+        input_tokens: row.get(7)?,
+        uncached_input_tokens: row.get(6)?,
+        cache_read_tokens: row.get(8)?,
+        cache_write_tokens: row.get(9)?,
+        output_tokens: row.get(10)?,
+        cost_usd: row.get(11)?,
+        key_id: row.get(12)?,
+        plan: row.get(13)?,
     })
 }
 
@@ -645,6 +839,126 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = Database::open(&dir.path().join("test.db")).unwrap();
         (dir, db)
+    }
+
+    #[test]
+    fn cache_backfill_migration_resets_sync_cursor_without_deleting_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let db = Database::open(&path).unwrap();
+        let account = db
+            .create_account(
+                &AccountInput {
+                    name: "backfill".into(),
+                    workspace_id: "wrk_backfill".into(),
+                    auth_cookie: "not-stored".into(),
+                },
+                "secret/backfill",
+            )
+            .unwrap();
+        db.insert_usage(
+            &account.id,
+            "wrk_backfill",
+            &[NewUsageRecord {
+                usg_id: "usg_existing".into(),
+                created_at: now_iso(),
+                model: "model".into(),
+                provider: None,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_tokens: 0,
+                cache_write_5m_tokens: 0,
+                cache_write_1h_tokens: 0,
+                cost_raw: 1,
+                cost_usd: 0.000000001,
+                key_id: None,
+                plan: None,
+            }],
+        )
+        .unwrap();
+        db.update_sync_success(&account.id, 12, true).unwrap();
+        db.conn()
+            .unwrap()
+            .execute("DELETE FROM schema_migrations WHERE version = 5", [])
+            .unwrap();
+        drop(db);
+
+        let reopened = Database::open(&path).unwrap();
+        let state = reopened.sync_state(&account.id).unwrap();
+        assert_eq!(state.deepest_page_fetched, -1);
+        assert!(!state.history_complete);
+        assert_eq!(
+            reopened
+                .usage_page(&UsageQuery {
+                    offset: 0,
+                    limit: 10,
+                    account_id: Some(account.id),
+                })
+                .unwrap()
+                .total,
+            1
+        );
+    }
+
+    #[test]
+    fn cost_migration_recomputes_underreported_costs_from_cost_raw() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let db = Database::open(&path).unwrap();
+        let account = db
+            .create_account(
+                &AccountInput {
+                    name: "cost".into(),
+                    workspace_id: "wrk_cost".into(),
+                    auth_cookie: "not-stored".into(),
+                },
+                "secret/cost",
+            )
+            .unwrap();
+        // cost_raw=10200000 means 0.102 USD at the correct 1e-8 rate, but an
+        // older version stored 1e9-divided cost_usd (0.0102, 10x too low).
+        db.insert_usage(
+            &account.id,
+            "wrk_cost",
+            &[NewUsageRecord {
+                usg_id: "usg_cost".into(),
+                created_at: now_iso(),
+                model: "model".into(),
+                provider: None,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_tokens: 0,
+                cache_write_5m_tokens: 0,
+                cache_write_1h_tokens: 0,
+                cost_raw: 10200000,
+                cost_usd: 0.0102,
+                key_id: None,
+                plan: None,
+            }],
+        )
+        .unwrap();
+        // Force the cost migration to run again on the next open.
+        db.conn()
+            .unwrap()
+            .execute("DELETE FROM schema_migrations WHERE version = 6", [])
+            .unwrap();
+        drop(db);
+
+        let reopened = Database::open(&path).unwrap();
+        let records = reopened
+            .usage_page(&UsageQuery {
+                offset: 0,
+                limit: 10,
+                account_id: Some(account.id),
+            })
+            .unwrap()
+            .records;
+        assert_eq!(records.len(), 1);
+        assert!(
+            (records[0].cost_usd - 0.102).abs() < 0.0000001,
+            "cost_usd should be recomputed to 0.102, got {}",
+            records[0].cost_usd
+        );
     }
 
     #[test]
@@ -699,6 +1013,9 @@ mod tests {
                 provider: None,
                 input_tokens: 10,
                 output_tokens: 2,
+                cache_read_tokens: 0,
+                cache_write_5m_tokens: 0,
+                cache_write_1h_tokens: 0,
                 cost_raw: 1000,
                 cost_usd: 0.000001,
                 key_id: None,
@@ -742,6 +1059,9 @@ mod tests {
             provider: None,
             input_tokens: 10,
             output_tokens: 2,
+            cache_read_tokens: 0,
+            cache_write_5m_tokens: 0,
+            cache_write_1h_tokens: 0,
             cost_raw: 1000,
             cost_usd: 0.000001,
             key_id: None,
@@ -782,6 +1102,70 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(schema_version, 3);
+        assert_eq!(schema_version, 6);
+    }
+
+    #[test]
+    fn cache_tokens_are_preserved_and_included_in_totals() {
+        let (_dir, db) = test_db();
+        let account = db
+            .create_account(
+                &AccountInput {
+                    name: "cache-test".into(),
+                    workspace_id: "wrk_cache".into(),
+                    auth_cookie: "never-stored".into(),
+                },
+                "secret/cache",
+            )
+            .unwrap();
+        let record = NewUsageRecord {
+            usg_id: "usg_cache".into(),
+            created_at: now_iso(),
+            model: "cache-model".into(),
+            provider: None,
+            input_tokens: 10,
+            output_tokens: 4,
+            cache_read_tokens: 20,
+            cache_write_5m_tokens: 3,
+            cache_write_1h_tokens: 2,
+            cost_raw: 1000,
+            cost_usd: 0.000001,
+            key_id: None,
+            plan: None,
+        };
+        assert_eq!(
+            db.insert_usage(&account.id, "wrk_cache", &[record.clone(), record])
+                .unwrap(),
+            1
+        );
+
+        let usage = db
+            .usage_page(&UsageQuery {
+                offset: 0,
+                limit: 10,
+                account_id: Some(account.id.clone()),
+            })
+            .unwrap();
+        assert_eq!(usage.records[0].uncached_input_tokens, 10);
+        assert_eq!(usage.records[0].cache_read_tokens, 20);
+        assert_eq!(usage.records[0].cache_write_tokens, 5);
+        assert_eq!(usage.records[0].input_tokens, 35);
+
+        let model = db.model_stats("today", Some(&account.id)).unwrap();
+        assert_eq!(model[0].total_input_tokens, 35);
+        assert_eq!(model[0].cache_hit_tokens, 20);
+        assert_eq!(model[0].cache_write_tokens, 5);
+
+        let daily = db.daily_stats(0, Some(&account.id)).unwrap();
+        assert_eq!(daily[0].total_input_tokens, 35);
+        assert_eq!(daily[0].total_output_tokens, 4);
+
+        assert_eq!(db.model_stats("all", Some(&account.id)).unwrap().len(), 1);
+        assert_eq!(
+            db.daily_model_stats(u16::MAX, Some(&account.id))
+                .unwrap()
+                .len(),
+            1
+        );
     }
 }

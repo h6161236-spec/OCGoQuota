@@ -40,10 +40,12 @@
     "seconds": "s"
   },
   "timeRange": {
+    "today": "Today",
     "7days": "7 Days",
     "14days": "14 Days",
     "30days": "30 Days",
-    "90days": "90 Days"
+    "90days": "90 Days",
+    "all": "All"
   },
   "dashboard": {
     "title": "Usage Dashboard",
@@ -52,6 +54,8 @@
     "remainingQuota": "Remaining Quota",
     "avgRemainingRatio": "Avg Remaining Ratio",
     "totalTokenConsumption": "Total Token Consumption",
+    "todayTokenUsage": "Today's Token Usage",
+    "todayTokenDesc": "Since midnight",
     "requests": "{{count}} Requests",
     "accountQuotaStatus": "Account Quota Status",
     "modelTop3": "Top 3 Models",
@@ -80,6 +84,13 @@
     "input": "Input",
     "output": "Output",
     "totalCost": "Total Cost",
+    "breakdownTitle": "Token Breakdown",
+    "uncachedInput": "Uncached input",
+    "cacheHit": "Cache hit",
+    "cacheWrite": "Cache write",
+    "cacheHitRateLabel": "Cache Hit Rate",
+    "totalInput": "Total input",
+    "cacheHitRate": "Cache hit rate: {{rate}}%",
     "modelRanking": "Model Ranking",
     "dailyTrends": "Daily Trends",
     "modelUsage": "Token Usage by Model",

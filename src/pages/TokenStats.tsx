@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePolling } from '../hooks/usePolling';
 import { api } from '../api/client';
@@ -6,26 +6,41 @@ import type { ModelTokenStat, OpenCodeAccount } from '../api/types';
 import { ModelIcon } from '../components/ModelIcon';
 import { ModelRankChart } from '../components/ModelRankChart';
 import { DailyModelChart } from '../components/DailyModelChart';
+import { getStoredTimeRange, storeTimeRange, TimeRangeTabs, type TimeRange } from '../components/TimeRangeTabs';
+import { TokenBreakdownTooltip } from '../components/TokenBreakdownTooltip';
+
+const RANGE_DAYS: Record<TimeRange, number> = {
+  today: 0,
+  '7d': 7,
+  '30d': 30,
+  all: 65535,
+};
 
 export function TokenStats() {
   const { t } = useTranslation();
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<TimeRange>(getStoredTimeRange);
   const [accountId, setAccountId] = useState('');
   const [tab, setTab] = useState<'ranking' | 'daily'>('ranking');
+
+  useEffect(() => {
+    storeTimeRange(range);
+  }, [range]);
 
   const { data: accounts } = usePolling(() => api.listOpenCodeAccounts(), 120000);
 
   const aid = accountId || undefined;
   const { data: modelTokens } = usePolling(
-    () => api.getModelTokenStats(days, aid),
+    () => api.getModelTokenStats(RANGE_DAYS[range], aid),
     60000,
     tab === 'ranking',
+    [range, aid, tab],
   );
 
   const { data: dailyModels } = usePolling(
-    () => api.getDailyModelStats(days, aid),
+    () => api.getDailyModelStats(RANGE_DAYS[range], aid),
     60000,
     tab === 'daily',
+    [range, aid, tab],
   );
 
   const stats = modelTokens?.stats ?? [];
@@ -35,6 +50,10 @@ export function TokenStats() {
   const totalOutput = stats.reduce((s, m) => s + m.total_output_tokens, 0);
   const totalCost = stats.reduce((s, m) => s + m.total_cost_usd, 0);
   const totalRequests = stats.reduce((s, m) => s + m.request_count, 0);
+  const uncachedInput = stats.reduce((s, m) => s + m.uncached_input_tokens, 0);
+  const cacheHit = stats.reduce((s, m) => s + m.cache_hit_tokens, 0);
+  const cacheWrite = stats.reduce((s, m) => s + m.cache_write_tokens, 0);
+  const cacheHitRate = totalInput > 0 ? ((cacheHit / totalInput) * 100).toFixed(1) : '0.0';
 
   const formatTokens = (v: number) => {
     if (v >= 1_000_000) return (v / 1_000_000).toFixed(2) + 'M';
@@ -57,29 +76,30 @@ export function TokenStats() {
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
-          <select
-            className="select select-bordered select-sm w-full sm:w-24"
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          >
-            <option value={7}>{t('timeRange.7days')}</option>
-            <option value={14}>{t('timeRange.14days')}</option>
-            <option value={30}>{t('timeRange.30days')}</option>
-            <option value={90}>{t('timeRange.90days')}</option>
-          </select>
+          <TimeRangeTabs value={range} onChange={setRange} />
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
         {[
           { label: t('tokenStats.totalRequests'), value: totalRequests.toLocaleString() },
-          { label: t('tokenStats.input'), value: formatTokens(totalInput) },
-          { label: t('tokenStats.output'), value: formatTokens(totalOutput) },
+          {
+            label: t('common.totalTokens'),
+            value: formatTokens(totalInput + totalOutput),
+            breakdown: { uncachedInput, cacheHit, cacheWrite, output: totalOutput },
+          },
           { label: t('tokenStats.totalCost'), value: `$${totalCost.toFixed(4)}` },
+          { label: t('tokenStats.cacheHitRateLabel'), value: `${cacheHitRate}%` },
         ].map((item) => (
           <div key={item.label} className="border border-base-200 rounded-lg px-3 sm:px-4 py-2.5">
             <div className="text-[11px] font-bold text-base-content/40 uppercase">{item.label}</div>
-            <div className="text-lg font-bold mt-0.5">{item.value}</div>
+            {item.breakdown ? (
+              <TokenBreakdownTooltip {...item.breakdown}>
+                <div className="text-lg font-bold mt-0.5">{item.value}</div>
+              </TokenBreakdownTooltip>
+            ) : (
+              <div className="text-lg font-bold mt-0.5">{item.value}</div>
+            )}
           </div>
         ))}
       </div>
@@ -115,6 +135,9 @@ export function TokenStats() {
                   <tr className="text-base-content/40 text-xs uppercase tracking-wider">
                     <th>{t('tokenStats.tableModel')}</th>
                     <th className="text-right">{t('tokenStats.tableRequests')}</th>
+                    <th className="text-right">{t('tokenStats.uncachedInput')}</th>
+                    <th className="text-right">{t('tokenStats.cacheHit')}</th>
+                    <th className="text-right">{t('tokenStats.cacheWrite')}</th>
                     <th className="text-right">{t('tokenStats.tableInput')}</th>
                     <th className="text-right">{t('tokenStats.tableOutput')}</th>
                     <th className="text-right">{t('tokenStats.tableTotalTokens')}</th>
@@ -124,7 +147,7 @@ export function TokenStats() {
                 <tbody>
                   {stats.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-base-content/40 text-sm">
+                      <td colSpan={9} className="text-center py-8 text-base-content/40 text-sm">
                         {t('common.noData')}
                       </td>
                     </tr>
@@ -138,6 +161,9 @@ export function TokenStats() {
                           </div>
                         </td>
                         <td className="text-right text-sm tabular-nums">{m.request_count.toLocaleString()}</td>
+                        <td className="text-right text-sm tabular-nums">{m.uncached_input_tokens.toLocaleString()}</td>
+                        <td className="text-right text-sm tabular-nums text-success">{m.cache_hit_tokens.toLocaleString()}</td>
+                        <td className="text-right text-sm tabular-nums text-info">{m.cache_write_tokens.toLocaleString()}</td>
                         <td className="text-right text-sm tabular-nums">{m.total_input_tokens.toLocaleString()}</td>
                         <td className="text-right text-sm tabular-nums">{m.total_output_tokens.toLocaleString()}</td>
                         <td className="text-right text-sm tabular-nums">

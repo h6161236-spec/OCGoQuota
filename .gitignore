@@ -53,3 +53,9 @@ service.json
 # opencode skill files
 .agents/
 skills-lock.json
+
+# Agent tooling local state
+.reasonix/
+
+# Tauri generated icon output (icons come from public/icon.png via scripts)
+src-tauri/icons/

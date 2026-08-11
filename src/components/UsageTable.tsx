@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { UsageRecord } from '../api/types';
 import { ModelIcon } from './ModelIcon';
+import { TokenBreakdownTooltip } from './TokenBreakdownTooltip';
 
 interface UsageTableProps {
   records: UsageRecord[];
@@ -65,7 +66,16 @@ export function UsageTable({ records, showAccount }: UsageTableProps) {
                     <span className="truncate">{r.model}</span>
                   </div>
                 </td>
-                <td className="text-right text-sm tabular-nums">{r.input_tokens.toLocaleString()}</td>
+                <td className="text-right text-sm tabular-nums">
+                  <TokenBreakdownTooltip
+                    uncachedInput={r.uncached_input_tokens}
+                    cacheHit={r.cache_read_tokens}
+                    cacheWrite={r.cache_write_tokens}
+                    output={r.output_tokens}
+                  >
+                    <span>{r.input_tokens.toLocaleString()}</span>
+                  </TokenBreakdownTooltip>
+                </td>
                 <td className="text-right text-sm tabular-nums">{r.output_tokens.toLocaleString()}</td>
                 <td className="text-right text-sm tabular-nums">${r.cost_usd.toFixed(6)}</td>
                 <td className="text-xs">

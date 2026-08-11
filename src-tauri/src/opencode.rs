@@ -364,8 +364,12 @@ pub fn parse_usage_response(text: &str) -> AppResult<Vec<NewUsageRecord>> {
                     provider: extract_string(fragment, "provider"),
                     input_tokens,
                     output_tokens,
+                    cache_read_tokens: extract_i64(fragment, "cacheReadTokens").unwrap_or(0),
+                    cache_write_5m_tokens: extract_i64(fragment, "cacheWrite5mTokens").unwrap_or(0),
+                    cache_write_1h_tokens: extract_i64(fragment, "cacheWrite1hTokens").unwrap_or(0),
                     cost_raw,
-                    cost_usd: cost_raw as f64 / 1_000_000_000.0,
+                    // OpenCode usage API reports `cost` in 1e-8 USD units.
+                    cost_usd: cost_raw as f64 / 100_000_000.0,
                     key_id: extract_string(fragment, "keyID")
                         .or_else(|| extract_string(fragment, "keyId")),
                     plan: extract_string(fragment, "plan"),
@@ -523,11 +527,14 @@ mod tests {
 
     #[test]
     fn parses_original_usage_serialization() {
-        let response = r#"$R[0]={id:"usg_old",timeCreated:$R[1]=new Date("2026-07-27T15:44:00.000Z"),model:"glm-5.2",provider:"opencode",inputTokens:28264,outputTokens:380,cost:10200000,keyID:"key_old",enrichment:$R[2]={plan:"Go"}}"#;
+        let response = r#"$R[0]={id:"usg_old",timeCreated:$R[1]=new Date("2026-07-27T15:44:00.000Z"),model:"glm-5.2",provider:"opencode",inputTokens:28264,outputTokens:380,cacheReadTokens:1200,cacheWrite5mTokens:300,cacheWrite1hTokens:null,cost:10200000,keyID:"key_old",enrichment:$R[2]={plan:"Go"}}"#;
         let records = parse_usage_response(response).unwrap();
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].usg_id, "usg_old");
-        assert_eq!(records[0].cost_usd, 0.0102);
+        assert_eq!(records[0].cost_usd, 0.102);
+        assert_eq!(records[0].cache_read_tokens, 1200);
+        assert_eq!(records[0].cache_write_5m_tokens, 300);
+        assert_eq!(records[0].cache_write_1h_tokens, 0);
         assert_eq!(records[0].plan.as_deref(), Some("Go"));
     }
 

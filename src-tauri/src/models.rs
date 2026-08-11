@@ -108,6 +108,12 @@ pub struct UsageRecord {
     #[ts(type = "number")]
     pub input_tokens: i64,
     #[ts(type = "number")]
+    pub uncached_input_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_read_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_write_tokens: i64,
+    #[ts(type = "number")]
     pub output_tokens: i64,
     pub cost_usd: f64,
     pub key_id: Option<String>,
@@ -122,6 +128,9 @@ pub struct NewUsageRecord {
     pub provider: Option<String>,
     pub input_tokens: i64,
     pub output_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub cache_write_5m_tokens: i64,
+    pub cache_write_1h_tokens: i64,
     pub cost_raw: i64,
     pub cost_usd: f64,
     pub key_id: Option<String>,
@@ -182,6 +191,16 @@ pub struct DailyStat {
     pub total_cost_usd: f64,
     #[ts(type = "number")]
     pub request_count: i64,
+    #[ts(type = "number")]
+    pub total_input_tokens: i64,
+    #[ts(type = "number")]
+    pub uncached_input_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_hit_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_write_tokens: i64,
+    #[ts(type = "number")]
+    pub total_output_tokens: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -192,6 +211,16 @@ pub struct DailyModelStat {
     pub total_cost_usd: f64,
     #[ts(type = "number")]
     pub request_count: i64,
+    #[ts(type = "number")]
+    pub total_input_tokens: i64,
+    #[ts(type = "number")]
+    pub uncached_input_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_hit_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_write_tokens: i64,
+    #[ts(type = "number")]
+    pub total_output_tokens: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -202,6 +231,12 @@ pub struct ModelTokenStat {
     pub request_count: i64,
     #[ts(type = "number")]
     pub total_input_tokens: i64,
+    #[ts(type = "number")]
+    pub uncached_input_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_hit_tokens: i64,
+    #[ts(type = "number")]
+    pub cache_write_tokens: i64,
     #[ts(type = "number")]
     pub total_output_tokens: i64,
     pub total_cost_usd: f64,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { usePolling } from '../hooks/usePolling';
@@ -7,6 +7,8 @@ import { api } from '../api/client';
 import { syncEnabledAccounts } from '../api/sync-enabled-accounts';
 import { ModelIcon } from '../components/ModelIcon';
 import { UsageTable } from '../components/UsageTable';
+import { TokenBreakdownTooltip } from '../components/TokenBreakdownTooltip';
+import { getStoredTimeRange, storeTimeRange, TimeRangeTabs, type TimeRange } from '../components/TimeRangeTabs';
 import { useToast } from '../components/Toast';
 import type { QuotaWindow } from '../api/types';
 
@@ -34,6 +36,13 @@ const barLabelKeys: Record<string, string> = {
   '5h Rolling': 'dashboard.5h',
   Weekly: 'dashboard.7d',
   Monthly: 'dashboard.30d',
+};
+
+const RANGE_DAYS: Record<TimeRange, number> = {
+  today: 0,
+  '7d': 7,
+  '30d': 30,
+  all: 65535,
 };
 
 function QuotaBar({ windows }: { windows: QuotaWindow[] }) {
@@ -154,7 +163,18 @@ function ModelDonut({ models: raw }: { models: { model: string; total_input_toke
 export function Dashboard() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
+  const [topPeriod, setTopPeriod] = useState<TimeRange>(getStoredTimeRange);
+  useEffect(() => {
+    storeTimeRange(topPeriod);
+  }, [topPeriod]);
   const { data, loading, refetch } = usePolling(() => api.getDashboard('30d'), 30000);
+  const { data: topData } = usePolling(
+    () => api.getModelTokenStats(RANGE_DAYS[topPeriod]),
+    60000,
+    true,
+    [topPeriod],
+  );
+  const { data: todayData } = usePolling(() => api.getModelTokenStats(0), 60000);
   const syncAndRefresh = useCallback(async () => {
     try {
       const result = await syncEnabledAccounts({
@@ -176,16 +196,26 @@ export function Dashboard() {
   const overview = data?.overview?.opencode;
   const quota = (data?.quota ?? []).filter((q) => q.success);
   const tokens = data?.model_tokens ?? [];
+  const topTokens = topData?.stats ?? tokens;
+  const todayTokens = todayData?.stats ?? [];
 
   const hero = useMemo(() => {
     const tkn = tokens.reduce((s, m) => s + m.total_input_tokens + m.total_output_tokens, 0);
     const r = tokens.reduce((s, m) => s + m.request_count, 0);
+    const today = todayTokens.reduce((s, m) => s + m.total_input_tokens + m.total_output_tokens, 0);
+    const breakdown = {
+      uncachedInput: tokens.reduce((s, m) => s + m.uncached_input_tokens, 0),
+      cacheHit: tokens.reduce((s, m) => s + m.cache_hit_tokens, 0),
+      cacheWrite: tokens.reduce((s, m) => s + m.cache_write_tokens, 0),
+      output: tokens.reduce((s, m) => s + m.total_output_tokens, 0),
+    };
     return [
       { label: t('dashboard.account'), value: overview?.account_count ?? '-', sub: t('dashboard.availableBlocked', { available: overview?.success_count ?? 0, blocked: overview?.blocked_count ?? 0 }) },
       { label: t('dashboard.remainingQuota'), value: overview ? `${overview.avg_effective_remaining}%` : '-', sub: t('dashboard.avgRemainingRatio') },
-      { label: t('dashboard.totalTokenConsumption'), value: fmt(tkn), sub: t('dashboard.requests', { count: r.toLocaleString() }) },
+      { label: t('dashboard.totalTokenConsumption'), value: fmt(tkn), sub: t('dashboard.requests', { count: r.toLocaleString() }), breakdown },
+      { label: t('dashboard.todayTokenUsage'), value: todayData ? fmt(today) : '-', sub: t('dashboard.todayTokenDesc') },
     ];
-  }, [overview, tokens, t, i18n.language]);
+  }, [overview, tokens, todayTokens, todayData, t, i18n.language]);
 
   if (loading && !data) {
     return (
@@ -250,11 +280,17 @@ export function Dashboard() {
       >
         <div className="h-7" aria-hidden="true" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
           {hero.map((h) => (
             <div key={h.label} className="border border-base-200 rounded-xl px-4 py-3">
               <div className="text-[11px] font-bold text-base-content/40 uppercase tracking-wider">{h.label}</div>
+            {h.breakdown ? (
+              <TokenBreakdownTooltip {...h.breakdown}>
+                <div className="text-3xl font-bold mt-1">{h.value}</div>
+              </TokenBreakdownTooltip>
+            ) : (
               <div className="text-3xl font-bold mt-1">{h.value}</div>
+            )}
               <div className="text-[11px] text-base-content/40 mt-0.5">{h.sub}</div>
             </div>
           ))}
@@ -285,13 +321,16 @@ export function Dashboard() {
           </div>
 
           <div className="flex-1 border border-base-200 rounded-xl p-4">
-          <div className="text-xs font-bold text-base-content/50 uppercase tracking-wider mb-3">{t('dashboard.modelTop3')}</div>
-          <ModelDonut models={tokens} />
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-base-content/50 uppercase tracking-wider">{t('dashboard.modelTop3')}</div>
+            <TimeRangeTabs value={topPeriod} onChange={setTopPeriod} size="xs" />
+          </div>
+          <ModelDonut models={topTokens} />
           <div className="text-[11px] text-base-content/30 mt-3 pt-3 border-t border-base-200">
-            {tokens.length > 0
+            {topTokens.length > 0
               ? t('dashboard.mostConsumed', {
-                  model: tokens[0]?.model ?? '',
-                  percent: tokens[0] ? ((tokens[0].total_input_tokens + tokens[0].total_output_tokens) / (tokens.reduce((s, m) => s + m.total_input_tokens + m.total_output_tokens, 0)) * 100).toFixed(1) : 0,
+                  model: topTokens[0]?.model ?? '',
+                  percent: topTokens[0] ? ((topTokens[0].total_input_tokens + topTokens[0].total_output_tokens) / (topTokens.reduce((s, m) => s + m.total_input_tokens + m.total_output_tokens, 0)) * 100).toFixed(1) : 0,
                 })
               : t('dashboard.noModelData')}
           </div>

@@ -1,22 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePolling } from '../hooks/usePolling';
 import { api } from '../api/client';
 import type { OpenCodeAccount } from '../api/types';
 import { DailyChart } from '../components/DailyChart';
+import { getStoredTimeRange, storeTimeRange, TimeRangeTabs, type TimeRange } from '../components/TimeRangeTabs';
+
+const RANGE_DAYS: Record<TimeRange, number> = {
+  today: 0,
+  '7d': 7,
+  '30d': 30,
+  all: 65535,
+};
 
 export function DailyTrends() {
   const { t } = useTranslation();
-  const [days, setDays] = useState(30);
+  const [range, setRange] = useState<TimeRange>(getStoredTimeRange);
   const [accountId, setAccountId] = useState('');
   const [mode, setMode] = useState<'cost' | 'requests'>('cost');
+
+  useEffect(() => {
+    storeTimeRange(range);
+  }, [range]);
 
   const { data: accounts } = usePolling(() => api.listOpenCodeAccounts(), 120000);
 
   const aid = accountId || undefined;
   const { data } = usePolling(
-    () => api.getDailyStats(days, aid),
+    () => api.getDailyStats(RANGE_DAYS[range], aid),
     60000,
+    true,
+    [range, aid],
   );
 
   const stats = data?.stats ?? [];
@@ -39,16 +53,7 @@ export function DailyTrends() {
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
-          <select
-            className="select select-bordered select-sm w-full sm:w-24"
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          >
-            <option value={7}>{t('timeRange.7days')}</option>
-            <option value={14}>{t('timeRange.14days')}</option>
-            <option value={30}>{t('timeRange.30days')}</option>
-            <option value={90}>{t('timeRange.90days')}</option>
-          </select>
+          <TimeRangeTabs value={range} onChange={setRange} />
         </div>
       </div>
 
