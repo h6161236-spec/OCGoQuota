@@ -29,6 +29,11 @@ export interface HubError {
   retryable: boolean;
 }
 
+export type OpenCodeLoginResult =
+  | { status: 'ok'; workspace_id: string; auth_cookie: string }
+  | { status: 'cancelled' }
+  | { status: 'error'; error: string };
+
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     return await invokeTransport()<T>(command, args);
@@ -44,6 +49,8 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 }
 
 export interface HubClient {
+  loginOpenCode(): Promise<void>;
+  takeOpenCodeLoginResult(): Promise<OpenCodeLoginResult | null>;
   getDashboard(period: '5h' | '7d' | '30d'): Promise<Dashboard>;
   listAccounts(): Promise<Account[]>;
   createAccount(input: AccountInput): Promise<Account>;
@@ -60,6 +67,9 @@ export interface HubClient {
 }
 
 export const hubClient: HubClient = {
+  loginOpenCode: () => invoke<void>('start_opencode_login'),
+  takeOpenCodeLoginResult: () =>
+    invoke<OpenCodeLoginResult | null>('take_opencode_login_result'),
   getDashboard: (period) => invoke<Dashboard>('get_dashboard', { period }),
   listAccounts: () => invoke<Account[]>('list_accounts'),
   createAccount: (input) => invoke<Account>('create_account', { input }),
@@ -78,6 +88,8 @@ export const hubClient: HubClient = {
 
 export const api = {
   isTauri: () => true,
+  loginOpenCode: () => hubClient.loginOpenCode(),
+  takeOpenCodeLoginResult: () => hubClient.takeOpenCodeLoginResult(),
   getAppVersion: () => invoke<string>('get_app_version'),
   getDashboard: (period = '30d') =>
     hubClient.getDashboard(period as '5h' | '7d' | '30d'),

@@ -1,6 +1,7 @@
 mod commands;
 mod database;
 mod error;
+mod login;
 mod models;
 mod opencode;
 mod proxy;
@@ -8,7 +9,8 @@ mod secret_file;
 mod secrets;
 mod sync;
 
-use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 use commands::AppState;
 use database::Database;
@@ -25,11 +27,15 @@ pub fn run() {
             app.manage(AppState {
                 database: Arc::new(database),
                 sync: Arc::new(SyncManager::default()),
+                login_active: Arc::new(AtomicBool::new(false)),
+                login_result: Arc::new(Mutex::new(None)),
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_version,
+            login::start_opencode_login,
+            login::take_opencode_login_result,
             commands::list_accounts,
             commands::create_account,
             commands::update_account,

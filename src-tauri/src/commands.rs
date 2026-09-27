@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc, Mutex};
 
 use futures::future::join_all;
 use tauri::{AppHandle, State};
@@ -18,6 +18,8 @@ use crate::{
 pub struct AppState {
     pub database: Arc<Database>,
     pub sync: Arc<SyncManager>,
+    pub login_active: Arc<AtomicBool>,
+    pub login_result: Arc<Mutex<Option<crate::login::OpenCodeLoginResult>>>,
 }
 
 #[tauri::command]

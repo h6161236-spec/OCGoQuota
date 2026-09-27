@@ -191,6 +191,13 @@
     "resetDesc": "Reset sync settings, refresh settings, etc. to initial values. Account data is not affected.",
     "resetButton": "Reset to Defaults",
     "addAccountDialog": "Add OpenCode Account",
+    "loginViaBrowser": "Sign in to OpenCode",
+    "loginInProgress": "Opening the in-app sign-in page. The app will return and fill account details automatically.",
+    "loginSuccess": "Signed in and retrieved the Workspace ID and Auth Cookie",
+    "loginCancelled": "Sign-in cancelled",
+    "loginFailed": "Sign-in failed: {{msg}}",
+    "loginAutoNote": "Account details were filled automatically. Enter a name and save.",
+    "manualOr": "or enter manually",
     "name": "Name",
     "workspaceId": "Workspace ID",
     "authCookie": "Auth Cookie",
@@ -203,6 +210,7 @@
     "toastAddFailed": "Add failed: {{msg}}",
     "toastSyncComplete": "Sync complete! {{count}} new records",
     "toastSyncFailed": "Sync failed",
+    "toastSyncFailedMsg": "Sync failed: {{msg}}",
     "toastTestSuccess": "Test successful! workspace: {{id}}",
     "toastTestFailed": "Test failed: {{msg}}",
     "toastDeleted": "Account deleted",
@@ -234,7 +242,7 @@
     "syncDone": "Sync complete, added {{count}} records",
     "cookieGuide": {
       "title": "How to get the Auth Cookie",
-      "android": "1. Sign in to opencode.ai in a trusted browser and obtain the auth Cookie\n2. Transfer it to your phone using your own secure method\n3. Add an account in OCGoQuota and paste it\n4. Clear the clipboard afterwards and never share the Cookie."
+      "android": "Use “Sign in to OpenCode” to authorize in the in-app login window. If automatic sign-in is unavailable, you can still paste the auth Cookie manually. Clear the clipboard afterwards and never share the Cookie."
     }
   },
   "about": {

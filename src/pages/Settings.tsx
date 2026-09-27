@@ -7,6 +7,7 @@ import { useTheme } from '../components/ThemeProvider';
 import { useToast } from '../components/Toast';
 
 const emptyForm = { name: '', auth_cookie: '', workspace_id: 'Default' };
+const pendingLoginNameKey = 'ocgoquota-pending-login-name';
 
 export function Settings() {
   const { t, i18n } = useTranslation();
@@ -16,6 +17,8 @@ export function Settings() {
   const deleteModal = useRef<HTMLDialogElement>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [autoFilled, setAutoFilled] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<OpenCodeAccount | null>(null);
   const [syncing, setSyncing] = useState<Record<string, SyncProgress>>({});
   const [settings, setSettings] = useState<AppSettings>({ theme: 'system', language: 'system' });
@@ -25,6 +28,48 @@ export function Settings() {
   useEffect(() => {
     api.getSettings().then((value) => setSettings(value)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const pendingName = sessionStorage.getItem(pendingLoginNameKey);
+    if (pendingName === null) return;
+
+    let stopped = false;
+    let attempts = 0;
+    const pollResult = async () => {
+      if (stopped) return;
+      try {
+        const result = await api.takeOpenCodeLoginResult();
+        if (!result && attempts++ < 20) {
+          window.setTimeout(pollResult, 500);
+          return;
+        }
+        if (!result) return;
+
+        sessionStorage.removeItem(pendingLoginNameKey);
+        if (result.status === 'ok') {
+          setForm({
+            name: pendingName,
+            workspace_id: result.workspace_id,
+            auth_cookie: result.auth_cookie,
+          });
+          setAutoFilled(true);
+          addModal.current?.showModal();
+          toast(t('settings.loginSuccess'), 'success');
+        } else if (result.status === 'cancelled') {
+          toast(t('settings.loginCancelled'), 'info');
+        } else {
+          setForm({ ...emptyForm, name: pendingName });
+          addModal.current?.showModal();
+          toast(t('settings.loginFailed', { msg: result.error }), 'error');
+        }
+      } catch (error) {
+        sessionStorage.removeItem(pendingLoginNameKey);
+        toast(t('settings.loginFailed', { msg: (error as Error).message }), 'error');
+      }
+    };
+    void pollResult();
+    return () => { stopped = true; };
+  }, [t, toast]);
 
   const guideKey = useMemo(() => 'settings.cookieGuide.android', []);
 
@@ -54,6 +99,26 @@ export function Settings() {
       await savePreferences({ language: value });
     } catch (error) {
       toast(t('settings.toastUpdateFailed', { msg: (error as Error).message }), 'error');
+    }
+  };
+
+  const openAddAccount = () => {
+    setForm(emptyForm);
+    setAutoFilled(false);
+    addModal.current?.showModal();
+  };
+
+  const loginOpenCode = async () => {
+    setLoggingIn(true);
+    setAutoFilled(false);
+    sessionStorage.setItem(pendingLoginNameKey, form.name);
+    try {
+      await api.loginOpenCode();
+    } catch (error) {
+      sessionStorage.removeItem(pendingLoginNameKey);
+      toast(t('settings.loginFailed', { msg: (error as Error).message }), 'error');
+    } finally {
+      setLoggingIn(false);
     }
   };
 
@@ -100,14 +165,15 @@ export function Settings() {
       }));
       toast(t('settings.toastSyncComplete', { count: result.inserted }), 'success');
     } catch (error) {
+      const message = (error as Error).message;
       setSyncing((current) => ({
         ...current,
         [account.id]: {
           status: 'error', current: current[account.id]?.current || 0, total: 0,
-          inserted: current[account.id]?.inserted || 0, error: (error as Error).message,
+          inserted: current[account.id]?.inserted || 0, error: message,
         },
       }));
-      toast(t('settings.toastSyncFailed'), 'error');
+      toast(t('settings.toastSyncFailedMsg', { msg: message }), 'error');
     } finally {
       window.clearInterval(timer);
       await refetch();
@@ -194,7 +260,7 @@ export function Settings() {
             <h2 className="settings-heading">{t('settings.accounts')}</h2>
             <p className="settings-description">{t('settings.localSecretDesc')}</p>
           </div>
-          <button className="btn btn-primary btn-sm shrink-0" onClick={() => addModal.current?.showModal()}>
+          <button className="btn btn-primary btn-sm shrink-0" onClick={openAddAccount}>
             {t('settings.addAccount')}
           </button>
         </div>
@@ -262,6 +328,26 @@ export function Settings() {
           <h3 className="font-semibold text-base mb-1">{t('settings.addAccountDialog')}</h3>
           <p className="text-xs text-base-content/45 mb-5">{t('settings.localSecretDesc')}</p>
           <div className="space-y-4">
+            <button
+              className="btn btn-primary btn-sm w-full"
+              disabled={loggingIn}
+              onClick={loginOpenCode}
+            >
+              {loggingIn
+                ? <span className="loading loading-spinner loading-xs" />
+                : t('settings.loginViaBrowser')}
+            </button>
+            {loggingIn && (
+              <p className="text-xs text-base-content/50 text-center">
+                {t('settings.loginInProgress')}
+              </p>
+            )}
+            {autoFilled && (
+              <p className="text-xs text-success text-center">
+                {t('settings.loginAutoNote')}
+              </p>
+            )}
+            <div className="divider text-xs text-base-content/40">{t('settings.manualOr')}</div>
             <label className="form-control">
               <span className="label-text text-xs mb-1">{t('settings.name')}</span>
               <input className="input-native" value={form.name} placeholder={t('settings.namePlaceholder')}

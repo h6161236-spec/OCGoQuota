@@ -191,6 +191,13 @@
     "resetDesc": "将同步设置、刷新设置等恢复为初始值，账户数据不受影响。",
     "resetButton": "恢复默认设置",
     "addAccountDialog": "添加 OpenCode 账户",
+    "loginViaBrowser": "登录 OpenCode 自动获取",
+    "loginInProgress": "正在打开应用内登录页，成功后会自动返回并填入账户信息。",
+    "loginSuccess": "登录成功，已自动获取 Workspace ID 和 Auth Cookie",
+    "loginCancelled": "已取消登录",
+    "loginFailed": "登录失败: {{msg}}",
+    "loginAutoNote": "账户信息已自动获取，请填写名称后保存。",
+    "manualOr": "或手动填写",
     "name": "名称",
     "workspaceId": "Workspace ID",
     "authCookie": "Auth Cookie",
@@ -203,6 +210,7 @@
     "toastAddFailed": "添加失败: {{msg}}",
     "toastSyncComplete": "同步完成! 新增 {{count}} 条",
     "toastSyncFailed": "同步失败",
+    "toastSyncFailedMsg": "同步失败: {{msg}}",
     "toastTestSuccess": "测试成功! workspace: {{id}}",
     "toastTestFailed": "测试失败: {{msg}}",
     "toastDeleted": "账户已删除",
@@ -234,7 +242,7 @@
     "syncDone": "同步完成，新增 {{count}} 条",
     "cookieGuide": {
       "title": "如何获取 Auth Cookie",
-      "android": "1. 先在可信任的浏览器登录 opencode.ai 并取得 auth Cookie\n2. 通过自己的安全方式复制到手机\n3. 在 OCGoQuota 添加账户并粘贴\n4. 粘贴后清除剪贴板，不要把 Cookie 发给任何人。"
+      "android": "推荐点击“登录 OpenCode 自动获取”，在应用打开的登录窗口中完成授权。若自动登录不可用，仍可手动粘贴 auth Cookie；粘贴后请清除剪贴板，不要把 Cookie 发给任何人。"
     }
   },
   "about": {
